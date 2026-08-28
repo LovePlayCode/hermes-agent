@@ -8,6 +8,8 @@
 *.pyc*
 __pycache__/
 act/
+.agents/
+.codebuddy/
 .act-sandbox-agent.*
 .venv/
 .venv

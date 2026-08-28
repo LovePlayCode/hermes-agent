@@ -1,0 +1,524 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Hermes Desktop 架构",
+    "locale": "zh-CN",
+    "output": "hermes-desktop-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1240,
+      596
+    ],
+    "repository": {
+      "url": "https://github.com/NousResearch/hermes-agent.git",
+      "revision": "420e156bf36e61d047fa526b9e0fcf30b7f26f90"
+    },
+    "views": [
+      {
+        "id": "boot-path",
+        "label": "启动与主链路",
+        "focus": [
+          "main",
+          "backend-mgr",
+          "hermes-serve",
+          "preload",
+          "renderer",
+          "agent-core"
+        ],
+        "note": "主进程 spawn 本地后端，preload 架桥，渲染进程经 WebSocket 接入 agent 核心。"
+      },
+      {
+        "id": "connection-modes",
+        "label": "四种连接模式",
+        "focus": [
+          "conn-registry",
+          "backend-mgr",
+          "hermes-serve",
+          "remote-ssh",
+          "cloud"
+        ],
+        "note": "同一套 UI 可驱动本地子进程、远程 URL+token、SSH 后端或 Hermes Cloud。"
+      },
+      {
+        "id": "surface-gating",
+        "label": "能力与信任边界",
+        "focus": [
+          "preload",
+          "renderer",
+          "pty",
+          "hermes-serve",
+          "agent-core"
+        ],
+        "note": "渲染进程无 Node 权限，能力经 preload 白名单下发；GUI 工具面由会话来源决定，而非进程环境变量。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "main",
+      "type": "frontend",
+      "label": "Electron 主进程",
+      "sublabel": "app.whenReady()",
+      "pos": [
+        48,
+        200
+      ],
+      "size": [
+        166,
+        76
+      ],
+      "tag": "Node",
+      "sources": [
+        {
+          "path": "apps/desktop/electron/main.ts",
+          "line": 17318,
+          "label": "app.whenReady()"
+        },
+        {
+          "path": "apps/desktop/electron/main.ts",
+          "line": 13922,
+          "label": "createWindow()"
+        }
+      ]
+    },
+    {
+      "id": "backend-mgr",
+      "type": "backend",
+      "label": "后端进程管理",
+      "sublabel": "spawn / claim / reap",
+      "pos": [
+        48,
+        330
+      ],
+      "size": [
+        166,
+        66
+      ],
+      "tag": "单实例",
+      "sources": [
+        {
+          "path": "apps/desktop/electron/main.ts",
+          "line": 12248,
+          "label": "startHermes()"
+        },
+        {
+          "path": "apps/desktop/electron/main.ts",
+          "line": 17281,
+          "label": "单实例锁守卫"
+        }
+      ]
+    },
+    {
+      "id": "conn-registry",
+      "type": "database",
+      "label": "连接注册表",
+      "sublabel": "cloud / local / remote / ssh",
+      "pos": [
+        48,
+        436
+      ],
+      "size": [
+        166,
+        66
+      ],
+      "sources": [
+        {
+          "path": "apps/desktop/electron/connection-registry.ts",
+          "line": 47,
+          "label": "type ConnectionKind"
+        }
+      ]
+    },
+    {
+      "id": "preload",
+      "type": "security",
+      "label": "Preload 桥",
+      "sublabel": "contextBridge hermesDesktop",
+      "pos": [
+        292,
+        96
+      ],
+      "size": [
+        176,
+        72
+      ],
+      "tag": "隔离",
+      "sources": [
+        {
+          "path": "apps/desktop/electron/preload.ts",
+          "line": 14,
+          "label": "exposeInMainWorld('hermesDesktop')"
+        }
+      ]
+    },
+    {
+      "id": "renderer",
+      "type": "frontend",
+      "label": "渲染进程 UI",
+      "sublabel": "React 19 + Vite",
+      "pos": [
+        292,
+        220
+      ],
+      "size": [
+        176,
+        80
+      ],
+      "sources": [
+        {
+          "path": "apps/desktop/src/main.tsx",
+          "label": "React 入口"
+        },
+        {
+          "path": "apps/desktop/src/app/chat/index.tsx",
+          "label": "chat 面板"
+        },
+        {
+          "path": "apps/desktop/src/components/pane-shell/index.ts",
+          "label": "pane-shell 面板壳"
+        }
+      ]
+    },
+    {
+      "id": "pty",
+      "type": "security",
+      "label": "PTY 终端",
+      "sublabel": "node-pty 子进程",
+      "pos": [
+        560,
+        120
+      ],
+      "size": [
+        176,
+        66
+      ],
+      "tag": "隔离",
+      "sources": [
+        {
+          "path": "apps/desktop/electron/terminal-ipc.ts",
+          "line": 286,
+          "label": "hermes:terminal:start"
+        },
+        {
+          "path": "apps/desktop/electron/terminal-ipc.ts",
+          "line": 313,
+          "label": "nodePty.spawn()"
+        }
+      ]
+    },
+    {
+      "id": "hermes-serve",
+      "type": "backend",
+      "label": "hermes serve",
+      "sublabel": "127.0.0.1:PORT",
+      "pos": [
+        560,
+        330
+      ],
+      "size": [
+        176,
+        76
+      ],
+      "tag": "本地子进程",
+      "sources": [
+        {
+          "path": "apps/desktop/electron/main.ts",
+          "line": 12013,
+          "label": "serve --host 127.0.0.1 --port 0"
+        },
+        {
+          "path": "hermes_cli/web_server.py",
+          "line": 17676,
+          "label": "/api/ws JSON-RPC"
+        }
+      ]
+    },
+    {
+      "id": "agent-core",
+      "type": "backend",
+      "label": "Agent 核心循环",
+      "sublabel": "run_conversation()",
+      "pos": [
+        828,
+        330
+      ],
+      "size": [
+        172,
+        76
+      ],
+      "tag": "窄腰",
+      "sources": [
+        {
+          "path": "run_agent.py",
+          "line": 421,
+          "label": "class AIAgent"
+        },
+        {
+          "path": "agent/conversation_loop.py",
+          "line": 1823,
+          "label": "真实主循环"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "工具注册表",
+      "sublabel": "desktop_ui / project 工具集",
+      "pos": [
+        1046,
+        330
+      ],
+      "size": [
+        156,
+        76
+      ],
+      "sources": [
+        {
+          "path": "tools/registry.py",
+          "line": 452,
+          "label": "class ToolRegistry"
+        },
+        {
+          "path": "gateway/run.py",
+          "label": "GUI 网关按平台并入工具集"
+        }
+      ]
+    },
+    {
+      "id": "remote-ssh",
+      "type": "cloud",
+      "label": "远程后端",
+      "sublabel": "URL + token / SSH",
+      "pos": [
+        828,
+        500
+      ],
+      "size": [
+        176,
+        66
+      ],
+      "tag": "可选",
+      "sources": [
+        {
+          "path": "apps/desktop/electron/remote-lifecycle.ts",
+          "label": "远程后端生命周期"
+        },
+        {
+          "path": "apps/desktop/electron/ssh-connection.ts",
+          "label": "SSH 连接"
+        }
+      ]
+    },
+    {
+      "id": "cloud",
+      "type": "external",
+      "label": "Hermes Cloud",
+      "sublabel": "托管后端",
+      "pos": [
+        1046,
+        500
+      ],
+      "size": [
+        172,
+        66
+      ],
+      "tag": "外部",
+      "sources": [
+        {
+          "path": "apps/desktop/electron/connection-registry.ts",
+          "line": 47,
+          "label": "kind: 'cloud'"
+        }
+      ]
+    },
+    {
+      "id": "overlays",
+      "type": "frontend",
+      "label": "浮层窗口",
+      "sublabel": "HUD / 宠物 / 快录",
+      "pos": [
+        292,
+        24
+      ],
+      "size": [
+        176,
+        44
+      ],
+      "sources": [
+        {
+          "path": "apps/desktop/electron/main.ts",
+          "line": 13519,
+          "label": "spawnHudWindow()"
+        },
+        {
+          "path": "apps/desktop/electron/main.ts",
+          "line": 13075,
+          "label": "spawnPetOverlayWindow()"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Electron 主进程域（Node 全权限）",
+      "wraps": [
+        "main",
+        "backend-mgr",
+        "conn-registry",
+        "pty"
+      ],
+      "pad": 14
+    },
+    {
+      "kind": "region",
+      "label": "渲染进程域（无 Node，仅 preload 白名单）",
+      "wraps": [
+        "renderer",
+        "overlays"
+      ],
+      "pad": 14
+    },
+    {
+      "kind": "region",
+      "label": "Python 后端域",
+      "wraps": [
+        "hermes-serve",
+        "agent-core",
+        "tools"
+      ],
+      "pad": 14
+    }
+  ],
+  "connections": [
+    {
+      "from": "main",
+      "to": "preload",
+      "variant": "dashed"
+    },
+    {
+      "from": "preload",
+      "to": "renderer",
+      "label": "hermesDesktop API",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "from": "renderer",
+      "to": "main",
+      "label": "IPC invoke",
+      "variant": "dashed",
+      "labelAt": [
+        200,
+        196
+      ]
+    },
+    {
+      "from": "main",
+      "to": "overlays",
+      "variant": "dashed"
+    },
+    {
+      "from": "main",
+      "to": "backend-mgr",
+      "label": "启动后端",
+      "labelDy": 30
+    },
+    {
+      "from": "backend-mgr",
+      "to": "hermes-serve",
+      "label": "spawn",
+      "variant": "emphasis"
+    },
+    {
+      "from": "backend-mgr",
+      "to": "conn-registry",
+      "label": "解析连接",
+      "labelDy": 30
+    },
+    {
+      "from": "conn-registry",
+      "to": "remote-ssh",
+      "label": "remote / ssh",
+      "variant": "dashed"
+    },
+    {
+      "from": "conn-registry",
+      "to": "cloud",
+      "label": "cloud",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          131,
+          586
+        ],
+        [
+          1132.0,
+          586
+        ]
+      ]
+    },
+    {
+      "from": "renderer",
+      "to": "pty",
+      "label": "终端面板",
+      "variant": "dashed"
+    },
+    {
+      "from": "renderer",
+      "to": "hermes-serve",
+      "label": "ws /api/ws",
+      "variant": "emphasis"
+    },
+    {
+      "from": "remote-ssh",
+      "to": "hermes-serve",
+      "label": "或替代本地",
+      "variant": "dashed"
+    },
+    {
+      "from": "hermes-serve",
+      "to": "agent-core",
+      "label": "JSON-RPC"
+    },
+    {
+      "from": "agent-core",
+      "to": "tools",
+      "label": "工具调用"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "为什么 GUI 能力不能靠 HERMES_DESKTOP 判断",
+      "items": [
+        "客户端与后端可能是两台机器：本地 Electron、SSH 远端、URL+token、Hermes Cloud",
+        "只有前两种由 Electron 拉起并带 HERMES_DESKTOP=1，其余一半拓扑里该 env 键控静默失效",
+        "正解：工具集才是能力面开关（desktop_ui / project），由会话自身来源解析，而非后端进程环境"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "进程边界与可信面",
+      "items": [
+        "主进程：Node 全权限，spawn 后端、管 PTY、管连接与密钥（单实例锁持有者才有权）",
+        "渲染进程：无 Node，仅 preload 经 contextBridge 暴露的 hermesDesktop 白名单（约 15 组 API）",
+        "IPC：102 处 ipcMain.handle，83 个 hermes:* 命名空间通道",
+        "PTY 与浏览器子进程：主要的能力逃逸面，隔离在沙箱域"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "本地后端如何被拉起",
+      "items": [
+        "main.ts:12248 startHermes() → spawn hermes serve --host 127.0.0.1 --port 0（端口 0 由系统分配）",
+        "端口经 HERMES_DESKTOP_READY_FILE 回传；渲染进程连 ws://127.0.0.1:PORT/api/ws?token=…",
+        "HERMES_DESKTOP=1 时后端自行触发 cron（web_server.py:438），不依赖 Electron 侧 ticker"
+      ]
+    }
+  ]
+}

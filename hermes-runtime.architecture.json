@@ -1,0 +1,647 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Hermes Agent 运行时架构",
+    "locale": "zh-CN",
+    "output": "hermes-runtime-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1240,
+      580
+    ],
+    "repository": {
+      "url": "https://github.com/NousResearch/hermes-agent.git",
+      "revision": "420e156bf36e61d047fa526b9e0fcf30b7f26f90"
+    },
+    "views": [
+      {
+        "id": "turn-loop",
+        "label": "一轮对话主路径",
+        "focus": [
+          "cli",
+          "tui",
+          "gateway",
+          "agent-loop",
+          "prompt",
+          "provider",
+          "tools",
+          "session-db"
+        ],
+        "note": "从入口进入核心循环，经提示构建、模型调用、工具执行，最后落盘。"
+      },
+      {
+        "id": "capability-edges",
+        "label": "能力外延",
+        "focus": [
+          "tools",
+          "sandbox",
+          "browser",
+          "mcp",
+          "plugins",
+          "memory"
+        ],
+        "note": "扩展能力不进入核心 schema，只挂在工具注册表外延。"
+      },
+      {
+        "id": "trust-boundary",
+        "label": "信任与归属边界",
+        "focus": [
+          "sandbox",
+          "browser",
+          "llm-api",
+          "platforms",
+          "mcp",
+          "plugins",
+          "state"
+        ],
+        "note": "本地进程、沙箱子域与外部服务之间的分界。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "cli",
+      "type": "frontend",
+      "label": "CLI 入口",
+      "sublabel": "hermes chat",
+      "pos": [
+        48,
+        96
+      ],
+      "size": [
+        160,
+        56
+      ],
+      "tag": "本地",
+      "sources": [
+        {
+          "path": "hermes_cli/main.py",
+          "label": "main() / cmd_chat()"
+        },
+        {
+          "path": "cli.py",
+          "label": "HermesCLI"
+        }
+      ]
+    },
+    {
+      "id": "tui",
+      "type": "frontend",
+      "label": "TUI 网关",
+      "sublabel": "stdio JSON-RPC",
+      "pos": [
+        48,
+        176
+      ],
+      "size": [
+        160,
+        56
+      ],
+      "tag": "本地",
+      "sources": [
+        {
+          "path": "tui_gateway/server.py",
+          "label": "Ink ↔ Python 桥"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "frontend",
+      "label": "消息网关",
+      "sublabel": "Telegram / Discord / Slack",
+      "pos": [
+        48,
+        256
+      ],
+      "size": [
+        160,
+        66
+      ],
+      "tag": "常驻",
+      "sources": [
+        {
+          "path": "gateway/run.py",
+          "label": "GatewayRunner"
+        },
+        {
+          "path": "gateway/platform_registry.py",
+          "line": 232,
+          "label": "PlatformRegistry"
+        }
+      ]
+    },
+    {
+      "id": "cron",
+      "type": "backend",
+      "label": "定时调度器",
+      "sublabel": "cron jobs",
+      "pos": [
+        48,
+        24
+      ],
+      "size": [
+        160,
+        54
+      ],
+      "tag": "后台",
+      "sources": [
+        {
+          "path": "cron/scheduler.py",
+          "label": "scheduler"
+        }
+      ]
+    },
+    {
+      "id": "platforms",
+      "type": "external",
+      "label": "消息平台",
+      "sublabel": "~20 个平台适配器",
+      "pos": [
+        48,
+        448
+      ],
+      "size": [
+        160,
+        66
+      ],
+      "tag": "外部",
+      "sources": [
+        {
+          "path": "gateway/platforms/base.py",
+          "label": "平台适配器基类"
+        }
+      ]
+    },
+    {
+      "id": "prompt",
+      "type": "backend",
+      "label": "提示构建",
+      "sublabel": "stable / context / volatile",
+      "pos": [
+        292,
+        96
+      ],
+      "size": [
+        172,
+        66
+      ],
+      "tag": "缓存敏感",
+      "sources": [
+        {
+          "path": "agent/system_prompt.py",
+          "line": 341,
+          "label": "build_system_prompt_parts"
+        },
+        {
+          "path": "agent/prompt_caching.py",
+          "label": "cache breakpoint"
+        }
+      ]
+    },
+    {
+      "id": "agent-loop",
+      "type": "backend",
+      "label": "Agent 核心循环",
+      "sublabel": "run_conversation()",
+      "pos": [
+        292,
+        226
+      ],
+      "size": [
+        172,
+        80
+      ],
+      "tag": "窄腰",
+      "sources": [
+        {
+          "path": "run_agent.py",
+          "line": 421,
+          "label": "class AIAgent"
+        },
+        {
+          "path": "agent/conversation_loop.py",
+          "line": 1823,
+          "label": "真实主循环"
+        }
+      ]
+    },
+    {
+      "id": "plugins",
+      "type": "external",
+      "label": "插件与 Skills",
+      "sublabel": "~/.hermes/plugins",
+      "pos": [
+        1046,
+        150
+      ],
+      "size": [
+        172,
+        60
+      ],
+      "sources": [
+        {
+          "path": "plugins/__init__.py",
+          "label": "插件发现入口"
+        },
+        {
+          "path": "plugins/plugin_utils.py",
+          "label": "插件工具接口"
+        }
+      ]
+    },
+    {
+      "id": "compressor",
+      "type": "backend",
+      "label": "上下文压缩",
+      "sublabel": "trajectory compressor",
+      "pos": [
+        292,
+        400
+      ],
+      "size": [
+        172,
+        60
+      ],
+      "sources": [
+        {
+          "path": "trajectory_compressor.py",
+          "label": "CompressionConfig"
+        },
+        {
+          "path": "agent/conversation_compression.py",
+          "label": "压缩入口"
+        }
+      ]
+    },
+    {
+      "id": "provider",
+      "type": "cloud",
+      "label": "Provider 适配层",
+      "sublabel": "多模型统一接口",
+      "pos": [
+        560,
+        96
+      ],
+      "size": [
+        172,
+        66
+      ],
+      "sources": [
+        {
+          "path": "providers/base.py",
+          "label": "provider 抽象"
+        },
+        {
+          "path": "agent/anthropic_adapter.py",
+          "label": "适配器实现"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "工具注册表",
+      "sublabel": "dispatch + check_fn",
+      "pos": [
+        560,
+        226
+      ],
+      "size": [
+        172,
+        80
+      ],
+      "tag": "核心工具面",
+      "sources": [
+        {
+          "path": "tools/registry.py",
+          "line": 452,
+          "label": "class ToolRegistry"
+        },
+        {
+          "path": "tools/registry.py",
+          "line": 1128,
+          "label": "dispatch()"
+        },
+        {
+          "path": "agent/tool_executor.py",
+          "line": 1098,
+          "label": "并发执行"
+        }
+      ]
+    },
+    {
+      "id": "memory",
+      "type": "database",
+      "label": "记忆子系统",
+      "sublabel": "curator / providers",
+      "pos": [
+        560,
+        400
+      ],
+      "size": [
+        172,
+        60
+      ],
+      "sources": [
+        {
+          "path": "agent/memory_manager.py",
+          "label": "memory manager"
+        },
+        {
+          "path": "agent/curator.py",
+          "label": "记忆整理"
+        }
+      ]
+    },
+    {
+      "id": "llm-api",
+      "type": "external",
+      "label": "模型 API",
+      "sublabel": "OpenAI / Anthropic 等",
+      "pos": [
+        828,
+        96
+      ],
+      "size": [
+        166,
+        66
+      ],
+      "tag": "外部",
+      "sources": [
+        {
+          "path": "providers/base.py",
+          "label": "统一调用出口"
+        }
+      ]
+    },
+    {
+      "id": "sandbox",
+      "type": "security",
+      "label": "终端与沙箱",
+      "sublabel": "PTY / 子进程",
+      "pos": [
+        828,
+        222
+      ],
+      "size": [
+        166,
+        66
+      ],
+      "tag": "隔离",
+      "sources": [
+        {
+          "path": "tools/terminal_tool.py",
+          "label": "terminal 工具"
+        }
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "security",
+      "label": "浏览器驱动",
+      "sublabel": "CDP / Playwright",
+      "pos": [
+        828,
+        306
+      ],
+      "size": [
+        166,
+        60
+      ],
+      "tag": "隔离",
+      "sources": [
+        {
+          "path": "tools/browser_tool.py",
+          "label": "browser 工具"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "external",
+      "label": "MCP Servers",
+      "sublabel": "外部工具目录",
+      "pos": [
+        828,
+        374
+      ],
+      "size": [
+        166,
+        66
+      ],
+      "sources": [
+        {
+          "path": "tools/mcp_tool.py",
+          "label": "MCP 客户端"
+        },
+        {
+          "path": "mcp_serve.py",
+          "label": "Hermes 作为 MCP 服务"
+        }
+      ]
+    },
+    {
+      "id": "session-db",
+      "type": "database",
+      "label": "会话状态库",
+      "sublabel": "SQLite / HERMES_HOME",
+      "pos": [
+        560,
+        480
+      ],
+      "size": [
+        166,
+        60
+      ],
+      "sources": [
+        {
+          "path": "hermes_state.py",
+          "line": 28,
+          "label": "sqlite3 会话持久化"
+        }
+      ]
+    },
+    {
+      "id": "state",
+      "type": "cloud",
+      "label": "HERMES_HOME",
+      "sublabel": "config / skills / memory",
+      "pos": [
+        828,
+        480
+      ],
+      "size": [
+        156,
+        66
+      ],
+      "tag": "本地磁盘",
+      "sources": [
+        {
+          "path": "hermes_constants.py",
+          "label": "路径常量"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Hermes 本地进程（用户归属）",
+      "wraps": [
+        "cli",
+        "tui",
+        "gateway",
+        "cron",
+        "prompt",
+        "agent-loop",
+        "compressor",
+        "provider",
+        "tools",
+        "memory"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "security-group",
+      "label": "沙箱 / 子进程执行域",
+      "wraps": [
+        "sandbox",
+        "browser"
+      ],
+      "pad": 12
+    },
+    {
+      "kind": "region",
+      "label": "外部依赖与扩展",
+      "wraps": [
+        "llm-api",
+        "mcp",
+        "plugins"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "cli",
+      "to": "agent-loop",
+      "variant": "emphasis"
+    },
+    {
+      "from": "tui",
+      "to": "agent-loop"
+    },
+    {
+      "from": "gateway",
+      "to": "agent-loop"
+    },
+    {
+      "from": "cron",
+      "to": "agent-loop",
+      "label": "定时触发",
+      "variant": "dashed",
+      "labelDy": -34
+    },
+    {
+      "from": "gateway",
+      "to": "platforms",
+      "label": "长连接",
+      "labelDy": 30
+    },
+    {
+      "from": "agent-loop",
+      "to": "prompt",
+      "label": "构建前缀"
+    },
+    {
+      "from": "prompt",
+      "to": "provider",
+      "label": "提示 + 消息"
+    },
+    {
+      "from": "provider",
+      "to": "llm-api",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "provider",
+      "to": "tools",
+      "label": "tool_calls",
+      "variant": "emphasis",
+      "labelDy": 30
+    },
+    {
+      "from": "tools",
+      "to": "sandbox"
+    },
+    {
+      "from": "tools",
+      "to": "browser"
+    },
+    {
+      "from": "tools",
+      "to": "mcp",
+      "label": "工具目录",
+      "variant": "dashed",
+      "labelAt": [
+        812,
+        296
+      ]
+    },
+    {
+      "from": "tools",
+      "to": "plugins",
+      "label": "注册扩展",
+      "variant": "dashed",
+      "labelDy": -40
+    },
+    {
+      "from": "agent-loop",
+      "to": "compressor",
+      "label": "超限压缩",
+      "variant": "dashed",
+      "labelDy": 30
+    },
+    {
+      "from": "agent-loop",
+      "to": "memory",
+      "label": "读写记忆",
+      "variant": "dashed"
+    },
+    {
+      "from": "memory",
+      "to": "state",
+      "label": "持久化",
+      "variant": "dashed"
+    },
+    {
+      "from": "compressor",
+      "to": "session-db",
+      "label": "落盘",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "核心循环：刻意保持窄腰",
+      "items": [
+        "所有入口收敛到同一个 run_conversation()",
+        "run_agent.py:421 的 AIAgent 是门面，真实主循环在 agent/conversation_loop.py:1823",
+        "prompt 分 stable / context / volatile 三段，会话内前缀字节稳定"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "能力外延与信任边界",
+      "items": [
+        "扩展顺序：既有代码 → CLI+skill → check_fn 门控 → 插件 → MCP → 核心工具",
+        "沙箱域：终端 PTY 与浏览器 CDP 跑在子进程，是主要能力逃逸面",
+        "外部：模型 API、消息平台、MCP servers、第三方插件"
+      ]
+    }
+  ]
+}

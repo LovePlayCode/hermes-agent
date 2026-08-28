@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "桌面端发起一次 LLM 请求的完整链路",
+    "locale": "zh-CN",
+    "output": "hermes-llm-chain.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      980,
+      590
+    ],
+    "column_fit": "spread",
+    "views": [
+      {
+        "id": "outbound",
+        "label": "出站：UI 到网关",
+        "focus": [
+          "renderer",
+          "preload",
+          "main",
+          "wsserver",
+          "dispatcher"
+        ],
+        "note": "渲染进程自建 WebSocket；preload 只铸造 URL 与单次票据，不在数据面上。"
+      },
+      {
+        "id": "agent-core",
+        "label": "核心：提示构建与模型调用",
+        "focus": [
+          "dispatcher",
+          "agentloop",
+          "llmapi"
+        ],
+        "note": "run_conversation() 进入 while 循环，三段式提示构建后打向模型 API。"
+      },
+      {
+        "id": "tool-loop",
+        "label": "工具循环与流式回流",
+        "focus": [
+          "agentloop",
+          "registry",
+          "llmapi",
+          "dispatcher",
+          "renderer"
+        ],
+        "note": "tool_calls 触发执行并回灌消息列表，继续下一轮；delta 事件实时回流到 UI。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "renderer",
+      "type": "frontend",
+      "label": "渲染进程 UI",
+      "sublabel": "React 19"
+    },
+    {
+      "id": "preload",
+      "type": "security",
+      "label": "Preload 桥",
+      "sublabel": "hermesDesktop"
+    },
+    {
+      "id": "main",
+      "type": "frontend",
+      "label": "主进程",
+      "sublabel": "spawn + 票据"
+    },
+    {
+      "id": "wsserver",
+      "type": "backend",
+      "label": "hermes serve",
+      "sublabel": "/api/ws FastAPI"
+    },
+    {
+      "id": "dispatcher",
+      "type": "backend",
+      "label": "tui_gateway",
+      "sublabel": "JSON-RPC 分发"
+    },
+    {
+      "id": "agentloop",
+      "type": "backend",
+      "label": "Agent 核心",
+      "sublabel": "run_conversation()"
+    },
+    {
+      "id": "llmapi",
+      "type": "cloud",
+      "label": "模型 API",
+      "sublabel": "OpenAI / Anthropic"
+    },
+    {
+      "id": "registry",
+      "type": "backend",
+      "label": "工具注册表",
+      "sublabel": "dispatch()"
+    }
+  ],
+  "segments": [
+    {
+      "from": 152,
+      "to": 182,
+      "label": "① 连接与票据"
+    },
+    {
+      "from": 182,
+      "to": 237,
+      "label": "② 提交并分发"
+    },
+    {
+      "from": 238,
+      "to": 349,
+      "label": "③ 提示与模型调用"
+    },
+    {
+      "from": 350,
+      "to": 433,
+      "label": "④ 工具循环迭代"
+    },
+    {
+      "from": 436,
+      "to": 516,
+      "label": "⑤ 收束"
+    }
+  ],
+  "messages": [
+    {
+      "from": "renderer",
+      "to": "main",
+      "y": 170,
+      "label": "取 ws URL + 单次票据",
+      "variant": "dashed",
+      "note": "preload IPC hermes:gateway:ws-url；main.ts:12131 给出 ws://127.0.0.1:PORT/api/ws?token=…"
+    },
+    {
+      "from": "renderer",
+      "to": "wsserver",
+      "y": 198,
+      "label": "prompt.submit { session_id, text }",
+      "variant": "emphasis",
+      "note": "submit.ts:790；web_server.py:17692 校验 ticket/token 后转 dispatch"
+    },
+    {
+      "from": "dispatcher",
+      "to": "agentloop",
+      "y": 226,
+      "label": "_methods 查表 + 重绑 transport",
+      "variant": "default",
+      "note": "server.py:2932 查注册表；:363 重绑 transport 到当前活跃 ws"
+    },
+    {
+      "from": "dispatcher",
+      "to": "agentloop",
+      "y": 254,
+      "label": "agent.run_conversation(run_message, **kw)",
+      "variant": "emphasis",
+      "note": "server.py:12554；内部调用 build_system_prompt_parts()（system_prompt.py:341）"
+    },
+    {
+      "from": "agentloop",
+      "to": "llmapi",
+      "y": 282,
+      "label": "chat.completions.create / messages.stream",
+      "variant": "emphasis",
+      "note": "chat_completion_helpers.py:3971（OpenAI）/ :4553（Anthropic）"
+    },
+    {
+      "from": "llmapi",
+      "to": "agentloop",
+      "y": 310,
+      "label": "流式 chunk（stream_callback）",
+      "variant": "return",
+      "note": "server.py:12496 _stream → _emit(message.delta)"
+    },
+    {
+      "from": "agentloop",
+      "to": "renderer",
+      "y": 338,
+      "label": "message.delta（约 30fps 合并）",
+      "variant": "return",
+      "note": "ws.py:55/62 _TOKEN_COALESCE_S = 0.033"
+    },
+    {
+      "from": "llmapi",
+      "to": "agentloop",
+      "y": 366,
+      "label": "finish_reason = tool_calls",
+      "variant": "emphasis",
+      "note": "conversation_loop.py:7042 检出 tool_calls 分支"
+    },
+    {
+      "from": "agentloop",
+      "to": "registry",
+      "y": 394,
+      "label": "dispatch(name, args)",
+      "variant": "emphasis",
+      "note": "tool_executor.py:1098 → registry.py:1128；PTY / CDP 在沙箱子进程执行"
+    },
+    {
+      "from": "registry",
+      "to": "agentloop",
+      "y": 422,
+      "label": "make_tool_result_message → messages.append",
+      "variant": "return",
+      "note": "结果回灌消息列表，continue 进入下一轮迭代"
+    },
+    {
+      "from": "agentloop",
+      "to": "llmapi",
+      "y": 450,
+      "label": "下一轮迭代（携带工具结果）",
+      "variant": "dashed",
+      "note": "while 受 iteration_budget 约束，非 max_iterations"
+    },
+    {
+      "from": "agentloop",
+      "to": "dispatcher",
+      "y": 478,
+      "label": "return final_response",
+      "variant": "return",
+      "note": "无 tool_calls 时收束，conversation_loop.py:7684"
+    },
+    {
+      "from": "dispatcher",
+      "to": "renderer",
+      "y": 506,
+      "label": "message.complete",
+      "variant": "return",
+      "note": "server.py:12801；RPC 早已返回，完成靠事件通知"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "main",
+      "from": 164,
+      "to": 180,
+      "type": "frontend"
+    },
+    {
+      "participant": "wsserver",
+      "from": 192,
+      "to": 232,
+      "type": "backend"
+    },
+    {
+      "participant": "dispatcher",
+      "from": 220,
+      "to": 512,
+      "type": "backend"
+    },
+    {
+      "participant": "agentloop",
+      "from": 248,
+      "to": 484,
+      "type": "backend"
+    },
+    {
+      "participant": "llmapi",
+      "from": 276,
+      "to": 456,
+      "type": "cloud"
+    },
+    {
+      "participant": "registry",
+      "from": 388,
+      "to": 428,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "preload 不在数据面上",
+      "items": [
+        "渲染进程自开 WebSocket（json-rpc-gateway.ts:186），消息走 JSON-RPC 而非 IPC；preload 只铸造 ws URL + 单次票据"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "缓存与迭代约束",
+      "items": [
+        "提示三段式会话内从不重渲染以保住 prompt cache；prompt.submit 只是 ACK，完成由 message.complete 事件标志"
+      ]
+    }
+  ]
+}
