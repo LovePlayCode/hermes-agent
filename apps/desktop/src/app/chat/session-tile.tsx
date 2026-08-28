@@ -30,6 +30,7 @@ import { findGroupOfPane } from '@/components/pane-shell/tree/model'
 import { $layoutTree, closeTreePane, moveTreePane, setTreeGroupTabStrip } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { log93892 } from '@/debug/log-93892'
 import { transcribeAudio } from '@/hermes'
 import { useI18n } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'
@@ -354,14 +355,24 @@ export function SessionTilePane({ storedSessionId }: { storedSessionId: string }
     }
 
     resumingRef.current = true
+    log93892('4.resumeTile.start', {
+      storedSessionId,
+      gatewayOpen,
+      ownerProfile: ownerRoute?.profile,
+      ownerConnectionId: ownerRoute?.connectionId
+    })
 
     delegate
       .resumeTile(storedSessionId)
-      .then(id => patchSessionTile(storedSessionId, { error: undefined, runtimeId: id }))
+      .then(id => {
+        log93892('4.resumeTile.ok', { storedSessionId, runtimeId: id })
+        patchSessionTile(storedSessionId, { error: undefined, runtimeId: id })
+      })
       .catch(async (err: unknown) => {
         const message = err instanceof Error ? err.message : String(err)
 
         if (!/session not found|\b404\b/i.test(message)) {
+          log93892('4.resumeTile.fail', { storedSessionId, message })
           patchSessionTile(storedSessionId, { error: message })
 
           return
@@ -384,6 +395,19 @@ export function SessionTilePane({ storedSessionId }: { storedSessionId: string }
         resumingRef.current = false
       })
   }, [delegateRevision, gatewayOpen, ownerRoute, runtimeId, storedSessionId, tile?.error])
+
+  useEffect(() => {
+    if (runtimeId) {
+      return
+    }
+
+    log93892('9.tile.spinner', {
+      storedSessionId,
+      gatewayOpen,
+      error: tile?.error,
+      ownerProfile: ownerRoute?.profile
+    })
+  }, [gatewayOpen, ownerRoute?.profile, runtimeId, storedSessionId, tile?.error])
 
   // The gateway (re)opening invalidates any latched error — it likely came
   // from a not-yet-open gateway or the previous connection. Clearing it

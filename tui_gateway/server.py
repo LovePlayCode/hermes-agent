@@ -949,6 +949,12 @@ def _announce_session_reclaimed(session: dict, end_reason: str) -> None:
                 "reason": end_reason,
             },
         )
+        logger.info(
+            "[93892] 8.session.reclaimed sid=%s stored=%s reason=%s",
+            session.get("_sid"),
+            session.get("session_key"),
+            end_reason,
+        )
     except Exception:
         logger.debug("session.reclaimed broadcast failed", exc_info=True)
 
@@ -1342,6 +1348,12 @@ def _schedule_ws_orphan_reap(sid: str, *, delay_s: float | None = None) -> None:
             "_client_gone_interrupt_requested"
         ):
             logger.info("client_gone sid=%s action=reap", sid)
+        if session is not None:
+            logger.info(
+                "[93892] 7.orphan-reap-fire sid=%s stored=%s",
+                sid,
+                session.get("session_key"),
+            )
         _teardown_popped_session(session, end_reason="ws_orphan_reap")
 
     timer = threading.Timer(
@@ -1424,6 +1436,11 @@ def _close_sessions_for_transport(
                 session.pop("_client_gone_interrupt_requested", None)
             detached += 1
             try:
+                logger.info(
+                    "[93892] 7.detach+schedule-orphan-reap sid=%s grace_s=%s",
+                    sid,
+                    _WS_ORPHAN_REAP_GRACE_S,
+                )
                 _schedule_ws_orphan_reap(sid)
             except Exception:
                 pass

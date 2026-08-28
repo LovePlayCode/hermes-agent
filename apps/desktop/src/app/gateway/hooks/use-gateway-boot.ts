@@ -2,6 +2,7 @@ import { isGatewayReauthRequired, JsonRpcGatewayError, resolveGatewayWsUrl } fro
 import { useEffect, useRef } from 'react'
 
 import { shouldApplyPostBootProgressError } from '@/components/boot-failure-reauth'
+import { log93892 } from '@/debug/log-93892'
 import type { HermesConnection } from '@/global'
 import { HermesGateway } from '@/hermes'
 import { translateNow } from '@/i18n'
@@ -52,6 +53,7 @@ import {
 } from '@/store/session'
 import {
   $attentionSessionIds,
+  $sessionTiles,
   $workingSessionIds,
   liveSessionScopes,
   reconcileBusyStatesOnReconnect,
@@ -723,6 +725,19 @@ export function useGatewayBoot({
           keep.add(normalizeProfileKey(session.profile))
         }
       }
+
+      log93892('5.recomputeKeptGateways', {
+        activeProfile: $activeGatewayProfile.get(),
+        working: [...$workingSessionIds.get()],
+        attention: [...$attentionSessionIds.get()],
+        keep: [...keep],
+        openTiles: $sessionTiles.get().map(tile => ({
+          storedSessionId: tile.storedSessionId,
+          runtimeId: tile.runtimeId,
+          profile: tile.ownerRoute?.profile,
+          workspaceMode: tile.workspaceMode
+        }))
+      })
 
       pruneSecondaryGateways(keep)
     }

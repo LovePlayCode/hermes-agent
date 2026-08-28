@@ -146,7 +146,7 @@ async def test_runner_goal_hook_enqueues_into_the_key_the_adapter_drains(hermes_
     _session_key_for_source; the adapter drain uses build_session_key on the
     event source. These must agree or the continuation is orphaned under a
     key nobody drains (the silent-stall shape from #47699)."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import AsyncMock, MagicMock, patch
     from datetime import datetime
     import uuid
 
@@ -179,8 +179,21 @@ async def test_runner_goal_hook_enqueues_into_the_key_the_adapter_drains(hermes_
     adapter = _DrainProbeAdapter()
     runner.adapters = {Platform.SLACK: adapter}
 
-    GoalManager(session_entry.session_id).set("ship it")
-    with patch(
+    # The hook constructs a fresh GoalManager after warming SessionDB.
+    # On a loaded CI runner the bootstrap window can expire, so set()
+    # stays in-memory on this instance and the hook's reload sees no
+    # goal (pending keys=[]). Reuse the live manager and skip the DB
+    # warm so this test only asserts FIFO-key agreement.
+    mgr = GoalManager(session_entry.session_id)
+    mgr.set("ship it")
+    runner._warm_goals_session_db = AsyncMock()
+    runner._defer_goal_status_notice_after_delivery = AsyncMock()
+
+    async def _run_inline(func, *args):
+        return func(*args)
+
+    runner._run_in_executor_with_context = _run_inline
+    with patch("hermes_cli.goals.GoalManager", return_value=mgr), patch(
         "hermes_cli.goals.judge_goal",
         return_value=("continue", "still needs work", False, None, False),
     ):

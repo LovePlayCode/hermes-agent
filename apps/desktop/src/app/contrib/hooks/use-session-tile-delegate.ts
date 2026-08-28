@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 
+import { log93892 } from '@/debug/log-93892'
 import { getLatestSessionMessages, PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
 import { toChatMessages } from '@/lib/chat-messages'
 import { getSessionOwnerHint } from '@/store/session'
@@ -192,6 +193,14 @@ export function useSessionTileDelegate({
         if (!runtimeId) {
           throw new Error('resume returned no session id')
         }
+
+        log93892('4.resumeTile.backend', {
+          storedSessionId,
+          runtimeId,
+          running: Boolean(resumed?.info?.running),
+          model: resumed?.info?.model ?? null,
+          owner
+        })
 
         updateSessionState(
           runtimeId,

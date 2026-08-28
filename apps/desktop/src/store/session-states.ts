@@ -30,6 +30,7 @@ import {
   revealTreePane
 } from '@/components/pane-shell/tree/store'
 import type { WorkspaceMode } from '@/contrib/types'
+import { log93892 } from '@/debug/log-93892'
 import { stableArray } from '@/lib/stable-array'
 import { readJson, writeJson } from '@/lib/storage'
 import type { SessionInfo } from '@/types/hermes'
@@ -922,6 +923,10 @@ export function unbindTileRuntime(runtimeId: string) {
   const tiles = $sessionTiles.get()
 
   if (tiles.some(t => t.runtimeId === runtimeId)) {
+    log93892('8.unbindTileRuntime', {
+      runtimeId,
+      storedSessionId: tiles.find(t => t.runtimeId === runtimeId)?.storedSessionId
+    })
     $sessionTiles.set(tiles.map(t => (t.runtimeId === runtimeId ? { ...t, runtimeId: undefined } : t)))
   }
 }

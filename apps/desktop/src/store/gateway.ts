@@ -1,6 +1,7 @@
 import { type ConnectionState, type GatewayEvent, registryBackendScopeKey, resolveGatewayWsUrl } from '@hermes/shared'
 import { atom } from 'nanostores'
 
+import { log93892 } from '@/debug/log-93892'
 import type { HermesConnection } from '@/global'
 import { HermesGateway, setApiRequestConnection } from '@/hermes'
 import { reconnectBackoffDelayMs } from '@/lib/reconnect-backoff'
@@ -580,6 +581,16 @@ async function gatewayForProfile(
     entry.retained = true
   }
 
+  log93892('3.gatewayForProfile', {
+    profile: key,
+    leaseRequest,
+    retained: entry.retained,
+    scope: entry.scope,
+    activeKey: g.activeKey,
+    primaryProfile: g.primaryProfile,
+    alreadyOpen: isOpen(entry.gateway)
+  })
+
   entry.wantOpen = true
 
   if (leaseRequest) {
@@ -879,6 +890,14 @@ export async function openGatewayForAgent(connectionId: null | string, profile: 
   const entry = g.secondaries.get(scope) ?? createSecondary(profile, connectionId)
   entry.retained = true
   entry.wantOpen = true
+  log93892('3.openGatewayForAgent', {
+    scope,
+    profile,
+    connectionId,
+    retained: entry.retained,
+    activeKey: g.activeKey,
+    alreadyOpen: isOpen(entry.gateway)
+  })
 
   if (!isOpen(entry.gateway)) {
     await openSecondary(entry)
@@ -1075,6 +1094,14 @@ export function touchSecondaryGateways(): void {
 // Tear a secondary down: stop its reconnect loop, detach listeners, close the
 // socket. Caller handles removal from the map.
 function disposeSecondary(entry: Secondary): void {
+  log93892('6.disposeSecondary', {
+    scope: entry.scope,
+    profile: entry.profile,
+    retained: entry.retained,
+    activeRequests: entry.activeRequests,
+    connectionId: entry.connectionId,
+    activeKey: g.activeKey
+  })
   entry.wantOpen = false
   clearTimer(entry)
   entry.offEvent()
@@ -1104,6 +1131,44 @@ function restoreActiveToPrimaryIfEvicted(): void {
 // 'default' activity (and vice versa) — cross-connection attribution.
 export function pruneSecondaryGateways(keep: Set<string>): void {
   const now = Date.now()
+
+  const snapshot = [...g.secondaries].map(([key, entry]) => {
+    const spared =
+      key === g.activeKey ||
+      keep.has(key) ||
+      (!entry.connectionId && keep.has(entry.profile)) ||
+      entry.activeRequests > 0 ||
+      relayRetained(entry) ||
+      (Number.isFinite(entry.activationLeaseUntil) && entry.activationLeaseUntil > now)
+
+    return {
+      key,
+      profile: entry.profile,
+      retained: entry.retained,
+      activeRequests: entry.activeRequests,
+      connectionId: entry.connectionId,
+      spared,
+      reason: key === g.activeKey
+        ? 'activeKey'
+        : keep.has(key) || (!entry.connectionId && keep.has(entry.profile))
+          ? 'keep-set'
+          : entry.activeRequests > 0
+            ? 'activeRequests'
+            : relayRetained(entry)
+              ? 'relay'
+              : Number.isFinite(entry.activationLeaseUntil) && entry.activationLeaseUntil > now
+                ? 'activationLease'
+                : 'EVICT'
+    }
+  })
+
+  if (snapshot.length > 0) {
+    log93892('5.pruneSecondaryGateways', {
+      keep: [...keep],
+      activeKey: g.activeKey,
+      secondaries: snapshot
+    })
+  }
 
   for (const [key, entry] of [...g.secondaries]) {
     if (

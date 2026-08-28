@@ -5502,6 +5502,13 @@ async function openStoredBotChat(owner, storedId, summary) {
   }
 
   const { bot, name, route } = botOwner(owner)
+  console.log('[93892] 1.openStoredBotChat', {
+    storedId,
+    profile: name,
+    hasRoute: Boolean(route),
+    route,
+    keepAllProfilesScope: true
+  })
   const ownerKey = botWorkspaceOwnerKey(bot)
 
   const hasAuthoritativeCount =
@@ -5781,6 +5788,11 @@ async function ensureBotMetadata(bot) {
  *  remembers only this transient opened-view observation; it never stores or
  *  resolves a canonical-chat id. */
 async function openRosterBot(bot) {
+  console.log('[93892] 1.openRosterBot', {
+    name: bot?.name || bot?.profile,
+    profile: bot?.profile,
+    connectionId: bot?.connectionId || null
+  })
   const generation = ++botOpenGeneration
   const key = botRosterKey(bot)
   const meta = botRosterMeta(bot, $botMeta.get())

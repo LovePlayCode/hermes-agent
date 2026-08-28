@@ -569,6 +569,13 @@ async def handle_ws(
         except Exception as exc:
             _log.debug("ws close failed peer=%s error=%s", peer, exc)
         _log.info(
+            "[93892] 7.ws-closed peer=%s reason=%s reaped=%d detached=%d",
+            peer,
+            disconnect_reason,
+            reaped_sessions,
+            detached_sessions,
+        )
+        _log.info(
             "ws closed peer=%s reason=%s messages=%d parse_errors=%d "
             "dispatch_crashes=%d send_failures=%d reaped_sessions=%d detached_sessions=%d",
             peer,

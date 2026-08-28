@@ -41,6 +41,7 @@ import {
 import { onGatewayEvent } from '@/contrib/events'
 import { registry } from '@/contrib/registry'
 import type { WorkspaceMode } from '@/contrib/types'
+import { log93892 } from '@/debug/log-93892'
 import { deleteProfile, getLogs, getStatus, type HermesGateway } from '@/hermes'
 import {
   $gateway,
@@ -808,6 +809,7 @@ export const host = {
       // profile must dial through openGatewayForProfile (its established path),
       // not the registry-secondary path openGatewayForAgent takes for a 'local'
       // connection id. Behavior for a plain local open is unchanged.
+    
       const dial = explicitRoute
         ? () => openGatewayForAgent(explicitRoute.connectionId, explicitRoute.profile)
         : plan.switchWorkspace
@@ -815,6 +817,23 @@ export const host = {
           : plan.dialWithoutSwitching
             ? () => openGatewayForProfile(plan.dialWithoutSwitching as string)
             : null
+
+      log93892('2.openSession.plan', {
+        storedSessionId,
+        targetProfile,
+        activeProfile: $activeGatewayProfile.get(),
+        keepAllProfilesScope: options.keepAllProfilesScope,
+        explicitRoute,
+        dialWithoutSwitching: plan.dialWithoutSwitching,
+        switchWorkspace: plan.switchWorkspace,
+        dialVia: explicitRoute
+          ? 'openGatewayForAgent'
+          : plan.switchWorkspace
+            ? 'ensureGatewayProfile'
+            : plan.dialWithoutSwitching
+              ? 'openGatewayForProfile'
+              : 'none'
+      })
 
       if (dial) {
         // Bounded only on the hydration contract, which is where a budget and a

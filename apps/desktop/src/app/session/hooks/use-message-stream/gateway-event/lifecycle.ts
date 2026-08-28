@@ -1,5 +1,6 @@
 import type { HermesSkin } from '@hermes/shared/skin'
 
+import { log93892 } from '@/debug/log-93892'
 import {
   notifyCronChanged,
   notifyPairingChanged,
@@ -80,6 +81,10 @@ export function handleLifecycleEvent(ctx: GatewayEventContext): boolean {
     const reclaimedRuntimeId = String((payload as { session_id?: string } | undefined)?.session_id ?? '')
 
     if (reclaimedRuntimeId) {
+      log93892('8.session.reclaimed', {
+        runtimeId: reclaimedRuntimeId,
+        payload
+      })
       dropSessionState(reclaimedRuntimeId)
       // A tile bound to the reclaimed runtime would otherwise render an
       // empty transcript forever: its view reads $sessionStates[runtime]
