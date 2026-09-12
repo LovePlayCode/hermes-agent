@@ -85,7 +85,9 @@ class TestTerminatePid:
 
         calls = []
         monkeypatch.setattr(
-            status, "terminate_pid", lambda pid, force=False: calls.append((pid, force))
+            status,
+            "terminate_pid",
+            lambda pid, force=False, expected_start_time=None: calls.append((pid, force)),
         )
         # Process never dies, so the graceful wait exhausts and we escalate.
         monkeypatch.setattr(hs, "_pid_alive", lambda pid: True)
@@ -105,7 +107,9 @@ class TestTerminatePid:
 
         calls = []
         monkeypatch.setattr(
-            status, "terminate_pid", lambda pid, force=False: calls.append((pid, force))
+            status,
+            "terminate_pid",
+            lambda pid, force=False, expected_start_time=None: calls.append((pid, force)),
         )
         monkeypatch.setattr(hs, "_pid_alive", lambda pid: False)
 
@@ -116,7 +120,7 @@ class TestTerminatePid:
     def test_missing_process_does_not_escalate(self, monkeypatch):
         from gateway import status
 
-        def gone(pid, force=False):
+        def gone(pid, force=False, expected_start_time=None):
             raise ProcessLookupError()
 
         monkeypatch.setattr(status, "terminate_pid", gone)
